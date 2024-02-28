@@ -1,6 +1,6 @@
 // Uncomment this block to pass the first stage
 use std::{
-    io::Write,
+    io::{Read, Write},
     net::{TcpListener, TcpStream},
 };
 
@@ -27,11 +27,17 @@ fn main() {
 }
 
 fn handle_response(mut stream: &TcpStream) {
-    // stream
-    //     .write_all(b"+PONG\r\n")
-    //     .expect("Error writing stream");
-    match stream.write_all(b"+PONG\r\n") {
-        Ok(_) => println!("Write successful"),
-        Err(e) => println!("Error writing stream: {}", e),
+    let mut buff = [0; 512];
+
+    loop {
+        let bytes_read = stream.read(&mut buff).expect("Failed to read stream");
+
+        if bytes_read == 0 {
+            return;
+        }
+        match stream.write_all(b"+PONG\r\n") {
+            Ok(_) => println!("Write successful"),
+            Err(e) => println!("Error writing stream: {}", e),
+        }
     }
 }
