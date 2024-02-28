@@ -2,6 +2,7 @@
 use std::{
     io::{Read, Write},
     net::{TcpListener, TcpStream},
+    thread,
 };
 
 fn main() {
@@ -17,7 +18,9 @@ fn main() {
         match stream {
             Ok(stream) => {
                 println!("accepted new connection");
-                handle_response(&stream);
+                thread::spawn(|| {
+                    handle_response(stream);
+                });
             }
             Err(e) => {
                 println!("error: {}", e);
@@ -26,7 +29,7 @@ fn main() {
     }
 }
 
-fn handle_response(mut stream: &TcpStream) {
+fn handle_response(mut stream: TcpStream) {
     let mut buff = [0; 512];
 
     loop {
