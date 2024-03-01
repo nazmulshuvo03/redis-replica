@@ -1,8 +1,9 @@
 // Uncomment this block to pass the first stage
 use std::{
     collections::HashMap,
+    env,
     io::{Read, Write},
-    net::{TcpListener, TcpStream},
+    net::{SocketAddr, TcpListener, TcpStream},
     thread,
 };
 
@@ -115,8 +116,17 @@ fn main() {
     let storage: HashMap<String, Assets> = HashMap::new();
     println!("Storage: {:?}", storage);
 
+    let args: Vec<String> = env::args().collect();
+    println!("Env Args: {:?}", args);
+
+    let mut port: u16 = 6379;
+
+    if args.len() > 1 && args[1] == "--port" {
+        port = args[2].parse::<u16>().unwrap();
+    }
+
     // Uncomment this block to pass the first stage
-    let listener = TcpListener::bind("127.0.0.1:6379").unwrap();
+    let listener = TcpListener::bind(SocketAddr::from(([127, 0, 0, 1], port))).unwrap();
 
     for stream in listener.incoming() {
         match stream {
