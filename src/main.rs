@@ -6,7 +6,12 @@ use std::{
     thread,
 };
 
-fn handle_response(mut stream: TcpStream, mut storage: HashMap<String, String>) {
+mod assets;
+pub mod utils;
+
+use assets::Assets;
+
+fn handle_response(mut stream: TcpStream, mut storage: HashMap<String, Assets>) {
     let mut buff = [0; 512];
     let separator = "\r\n";
 
@@ -48,7 +53,17 @@ fn handle_response(mut stream: TcpStream, mut storage: HashMap<String, String>) 
                     .expect("Failed to write respnse");
             }
             "set" => {
-                storage.insert(raw_input_vec[4].to_string(), raw_input_vec[6].to_string());
+                let mut asset = Assets::new(raw_input_vec[6].to_string());
+                if raw_input_vec.len() > 8 {
+                    if raw_input_vec[8] == "px" {
+                        asset.update_expiry(raw_input_vec[10]);
+                    } else {
+                        println!("set is provided with any other parameter than px")
+                    }
+                } else {
+                    println!("No expiry provide");
+                }
+                storage.insert(raw_input_vec[4].to_string(), asset);
                 let res = format!("{}{}", "+OK", separator,);
                 println!("set command response: {:?}", res);
                 stream
@@ -56,12 +71,28 @@ fn handle_response(mut stream: TcpStream, mut storage: HashMap<String, String>) 
                     .expect("Failed to write respnse");
             }
             "get" => {
-                if let Some(value) = storage.get(raw_input_vec[4]) {
-                    let res = format!("${}{}{}{}", value.len(), separator, value, separator);
-                    println!("get command response object found: {:?}", res);
-                    stream
-                        .write_all(res.as_bytes())
-                        .expect("Failed to write response");
+                if let Some(asset) = storage.get(raw_input_vec[4]) {
+                    println!("Found asset: {:?}", asset);
+                    let mut new_asset = asset.clone();
+                    if !new_asset.is_value_expired() {
+                        let res = format!(
+                            "${}{}{}{}",
+                            new_asset.get_value_len(),
+                            separator,
+                            new_asset.get_value(),
+                            separator
+                        );
+                        println!("get command response object found: {:?}", res);
+                        stream
+                            .write_all(res.as_bytes())
+                            .expect("Failed to write response");
+                    } else {
+                        let res = format!("${}{}", "-1", separator);
+                        println!("get command response object not found: {:?}", res);
+                        stream
+                            .write_all(res.as_bytes())
+                            .expect("Failed to write response");
+                    }
                 } else {
                     let res = format!("${}{}", "-1", separator);
                     println!("get command response object not found: {:?}", res);
@@ -81,7 +112,7 @@ fn main() {
     // You can use print statements as follows for debugging, they'll be visible when running tests.
     println!("Logs from your program will appear here!");
 
-    let storage: HashMap<String, String> = HashMap::new();
+    let storage: HashMap<String, Assets> = HashMap::new();
     println!("Storage: {:?}", storage);
 
     // Uncomment this block to pass the first stage
