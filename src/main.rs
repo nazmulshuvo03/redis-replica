@@ -1,11 +1,12 @@
 // Uncomment this block to pass the first stage
 use std::{
+    collections::HashMap,
     io::{Read, Write},
     net::{TcpListener, TcpStream},
     thread,
 };
 
-fn handle_response(mut stream: TcpStream) {
+fn handle_response(mut stream: TcpStream, mut storage: HashMap<String, String>) {
     let mut buff = [0; 512];
     let separator = "\r\n";
 
@@ -25,23 +26,6 @@ fn handle_response(mut stream: TcpStream) {
         raw_input_str.chars().for_each(|c| print!("{} ", c));
         let raw_input_vec: Vec<&str> = raw_input_str.split(separator).collect();
         println!("Raw input vector: {:?}", raw_input_vec);
-
-        // let mut first: u32 = 0;
-        // match raw_input_vec.first() {
-        //     Some(v) => {
-        //         println!("first: {:?}", v);
-        //         match v.strip_prefix("*") {
-        //             Some(num) => {
-        //                 println!("Number from first: {:?}", num);
-        //                 let value: u32 = num.parse::<u32>().unwrap();
-        //                 first = value;
-        //             }
-        //             None => println!("Could not found * in first element"),
-        //         }
-        //     }
-        //     None => println!("There is no element in raw input array"),
-        // };
-        // println!("Value from first element: {}", first);
 
         let command = raw_input_vec[2];
 
@@ -63,6 +47,29 @@ fn handle_response(mut stream: TcpStream) {
                     .write_all(res.as_bytes())
                     .expect("Failed to write respnse");
             }
+            "set" => {
+                storage.insert(raw_input_vec[4].to_string(), raw_input_vec[6].to_string());
+                let res = format!("{}{}", "+OK", separator,);
+                println!("set command response: {:?}", res);
+                stream
+                    .write_all(res.as_bytes())
+                    .expect("Failed to write respnse");
+            }
+            "get" => {
+                if let Some(value) = storage.get(raw_input_vec[4]) {
+                    let res = format!("${}{}{}{}", value.len(), separator, value, separator);
+                    println!("get command response object found: {:?}", res);
+                    stream
+                        .write_all(res.as_bytes())
+                        .expect("Failed to write response");
+                } else {
+                    let res = format!("${}{}", "-1", separator);
+                    println!("get command response object not found: {:?}", res);
+                    stream
+                        .write_all(res.as_bytes())
+                        .expect("Failed to write response");
+                }
+            }
             _ => {
                 println!("Undefined command");
             }
@@ -74,6 +81,9 @@ fn main() {
     // You can use print statements as follows for debugging, they'll be visible when running tests.
     println!("Logs from your program will appear here!");
 
+    let storage: HashMap<String, String> = HashMap::new();
+    println!("Storage: {:?}", storage);
+
     // Uncomment this block to pass the first stage
     let listener = TcpListener::bind("127.0.0.1:6379").unwrap();
 
@@ -81,8 +91,9 @@ fn main() {
         match stream {
             Ok(stream) => {
                 println!("accepted new connection");
-                thread::spawn(|| {
-                    handle_response(stream);
+                let storage_clone = storage.clone();
+                thread::spawn(move || {
+                    handle_response(stream, storage_clone);
                 });
             }
             Err(e) => {
