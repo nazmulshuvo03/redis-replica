@@ -1,18 +1,21 @@
 // Uncomment this block to pass the first stage
 use std::{
     collections::HashMap,
-    env,
+    env::{self},
     io::{Read, Write},
     net::{SocketAddr, TcpListener, TcpStream},
     thread,
 };
 
+mod admin;
 mod assets;
 pub mod utils;
 
 use assets::Assets;
 
-fn handle_response(mut stream: TcpStream, mut storage: HashMap<String, Assets>) {
+use crate::admin::Admin;
+
+fn handle_response(mut admin: Admin, mut stream: TcpStream, mut storage: HashMap<String, Assets>) {
     let mut buff = [0; 512];
     let separator = "\r\n";
 
@@ -104,7 +107,7 @@ fn handle_response(mut stream: TcpStream, mut storage: HashMap<String, Assets>) 
             }
             "info" => {
                 // let line1 = "#Replication";
-                let line2 = "role:master";
+                let line2 = format!("role:{}", admin.get_role().as_str());
                 let res = format!(
                     "${}{}{}{}",
                     // "${}{}{}${}{}{}{}",
@@ -135,25 +138,33 @@ fn main() {
     let storage: HashMap<String, Assets> = HashMap::new();
     println!("Storage: {:?}", storage);
 
+    let mut admin = Admin::new();
+    println!("Admin: {:?}", admin);
+
     let args: Vec<String> = env::args().collect();
     println!("Env Args: {:?}", args);
 
-    let mut port: u16 = 6379;
-
     if args.len() > 1 && args[1] == "--port" {
-        port = args[2].parse::<u16>().unwrap();
+        let new_port: u16 = args[2].parse::<u16>().unwrap();
+        admin.set_port(new_port);
+    }
+
+    if args.len() > 3 && args[3] == "--replicaof" {
+        println!("replica of: {}:{}: ", args[4], args[5]);
+        admin.set_role(String::from("slave"))
     }
 
     // Uncomment this block to pass the first stage
-    let listener = TcpListener::bind(SocketAddr::from(([127, 0, 0, 1], port))).unwrap();
+    let listener = TcpListener::bind(SocketAddr::from(([127, 0, 0, 1], admin.get_port()))).unwrap();
 
     for stream in listener.incoming() {
         match stream {
             Ok(stream) => {
                 println!("accepted new connection");
                 let storage_clone = storage.clone();
+                let admin_clone = admin.clone();
                 thread::spawn(move || {
-                    handle_response(stream, storage_clone);
+                    handle_response(admin_clone, stream, storage_clone);
                 });
             }
             Err(e) => {
