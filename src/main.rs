@@ -102,6 +102,25 @@ fn handle_response(mut stream: TcpStream, mut storage: HashMap<String, Assets>) 
                         .expect("Failed to write response");
                 }
             }
+            "info" => {
+                // let line1 = "#Replication";
+                let line2 = "role:master";
+                let res = format!(
+                    "${}{}{}{}",
+                    // "${}{}{}${}{}{}{}",
+                    // line1.len(),
+                    // separator,
+                    // line1,
+                    line2.len(),
+                    separator,
+                    line2,
+                    separator
+                );
+                println!("info command response: {:?}", res);
+                stream
+                    .write_all(res.as_bytes())
+                    .expect("Failed to write message");
+            }
             _ => {
                 println!("Undefined command");
             }
