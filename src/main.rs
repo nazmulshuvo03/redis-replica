@@ -143,6 +143,9 @@ fn handle_handshake(master_host: String, master_port: u16) {
     let replconf_2 = "*3\r\n$8\r\nREPLCONF\r\n$4\r\ncapa\r\n$6\r\npsync2\r\n";
     stream.write_all(replconf_2.as_bytes()).unwrap();
 
+    let psync = "*3\r\n$5\r\nPSYNC\r\n$1\r\n?\r\n$2\r\n-1\r\n";
+    stream.write_all(psync.as_bytes()).unwrap();
+
     let result = stream.read(&mut read_buf);
     println!("Handshake result: {:?}", result)
 }
