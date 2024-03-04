@@ -116,6 +116,13 @@ fn handle_response(mut admin: Admin, mut stream: TcpStream, mut storage: HashMap
                     .write_all(res.as_bytes())
                     .expect("Failed to write message");
             }
+            "replconf" => {
+                let res = format!("{}{}", "+OK", separator);
+                println!("ping command response: {:?}", res);
+                stream
+                    .write_all(res.as_bytes())
+                    .expect("Failed to write respnse");
+            }
             _ => {
                 println!("Undefined command");
             }
@@ -123,10 +130,21 @@ fn handle_response(mut admin: Admin, mut stream: TcpStream, mut storage: HashMap
     }
 }
 
-fn handle_handshake(host: String, port: u16) {
-    let mut stream = TcpStream::connect(format!("{}:{}", host.as_str(), port)).unwrap();
+fn handle_handshake(master_host: String, master_port: u16) {
+    let mut read_buf: [u8; 256] = [0; 256];
+    let mut stream =
+        TcpStream::connect(format!("{}:{}", master_host.as_str(), master_port)).unwrap();
     let buf = "*1\r\n$4\r\nping\r\n";
     stream.write_all(buf.as_bytes()).unwrap();
+
+    let replconf_1 = "*3\r\n$8\r\nREPLCONF\r\n$14\r\nlistening-port\r\n$4\r\n6380\r\n";
+    stream.write_all(replconf_1.as_bytes()).unwrap();
+
+    let replconf_2 = "*3\r\n$8\r\nREPLCONF\r\n$4\r\ncapa\r\n$6\r\npsync2\r\n";
+    stream.write_all(replconf_2.as_bytes()).unwrap();
+
+    let result = stream.read(&mut read_buf);
+    println!("Handshake result: {:?}", result)
 }
 
 fn main() {
