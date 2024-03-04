@@ -1,9 +1,8 @@
-// Uncomment this block to pass the first stage
 use std::{
     collections::HashMap,
     env::{self},
     io::{Read, Write},
-    net::{SocketAddr, TcpListener, TcpStream},
+    net::{TcpListener, TcpStream},
     thread,
 };
 
@@ -13,7 +12,7 @@ pub mod utils;
 
 use assets::Assets;
 
-use crate::admin::Admin;
+use crate::admin::{Admin, Role};
 
 fn handle_response(mut admin: Admin, mut stream: TcpStream, mut storage: HashMap<String, Assets>) {
     let mut buff = [0; 512];
@@ -107,9 +106,9 @@ fn handle_response(mut admin: Admin, mut stream: TcpStream, mut storage: HashMap
                 }
             }
             "info" => {
-                let line1 = format!("role:{}", admin.get_role().as_str());
-                let line2 = format!("master_replid:{}", admin.get_id());
-                let line3 = format!("master_repl_offset:{}", admin.get_offset());
+                let line1 = format!("role:{}", admin.get_replica_role());
+                let line2 = format!("master_replid:{}", admin.get_replica_id());
+                let line3 = format!("master_repl_offset:{}", admin.get_replica_offset());
                 let line = format!("{}{}{}{}{}", line1, line_break, line2, line_break, line3);
                 let res = format!("${}{}{}{}", line.len(), separator, line, separator);
                 println!("info command response: {:?}", res);
@@ -122,6 +121,12 @@ fn handle_response(mut admin: Admin, mut stream: TcpStream, mut storage: HashMap
             }
         }
     }
+}
+
+fn handle_handshake(host: String, port: u16) {
+    let mut stream = TcpStream::connect(format!("{}:{}", host.as_str(), port)).unwrap();
+    let buf = "*1\r\n$4\r\nping\r\n";
+    stream.write_all(buf.as_bytes()).unwrap();
 }
 
 fn main() {
@@ -144,11 +149,18 @@ fn main() {
 
     if args.len() > 3 && args[3] == "--replicaof" {
         println!("replica of: {}:{}: ", args[4], args[5]);
-        admin.set_role(String::from("slave"))
+        let master_host = args[4].to_string();
+        let master_port = args[5].parse::<u16>().unwrap();
+        let role = Role::Slave;
+        admin.set_replica(master_host, master_port, role);
     }
 
     // Uncomment this block to pass the first stage
-    let listener = TcpListener::bind(SocketAddr::from(([127, 0, 0, 1], admin.get_port()))).unwrap();
+    let listener = TcpListener::bind(format!("{}:{}", admin.get_host(), admin.get_port())).unwrap();
+
+    if admin.get_replica_role() == Role::Slave {
+        handle_handshake(admin.get_replica_host(), admin.get_replica_port())
+    }
 
     for stream in listener.incoming() {
         match stream {
