@@ -18,6 +18,7 @@ use crate::admin::Admin;
 fn handle_response(mut admin: Admin, mut stream: TcpStream, mut storage: HashMap<String, Assets>) {
     let mut buff = [0; 512];
     let separator = "\r\n";
+    let line_break = "\n";
 
     loop {
         let bytes_read = stream.read(&mut buff).expect("Failed to read stream");
@@ -106,19 +107,11 @@ fn handle_response(mut admin: Admin, mut stream: TcpStream, mut storage: HashMap
                 }
             }
             "info" => {
-                // let line1 = "#Replication";
-                let line2 = format!("role:{}", admin.get_role().as_str());
-                let res = format!(
-                    "${}{}{}{}",
-                    // "${}{}{}${}{}{}{}",
-                    // line1.len(),
-                    // separator,
-                    // line1,
-                    line2.len(),
-                    separator,
-                    line2,
-                    separator
-                );
+                let line1 = format!("role:{}", admin.get_role().as_str());
+                let line2 = format!("master_replid:{}", admin.get_id());
+                let line3 = format!("master_repl_offset:{}", admin.get_offset());
+                let line = format!("{}{}{}{}{}", line1, line_break, line2, line_break, line3);
+                let res = format!("${}{}{}{}", line.len(), separator, line, separator);
                 println!("info command response: {:?}", res);
                 stream
                     .write_all(res.as_bytes())
