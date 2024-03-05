@@ -38,7 +38,7 @@ fn handle_response(mut admin: Admin, mut stream: TcpStream, mut storage: HashMap
 
         let command = raw_input_vec[2];
 
-        match command {
+        match command.to_lowercase().as_str() {
             "ping" => {
                 let res = format!("{}{}", "+PONG", separator);
                 println!("ping command response: {:?}", res);
@@ -118,7 +118,20 @@ fn handle_response(mut admin: Admin, mut stream: TcpStream, mut storage: HashMap
             }
             "replconf" => {
                 let res = format!("{}{}", "+OK", separator);
-                println!("ping command response: {:?}", res);
+                println!("replconf command response: {:?}", res);
+                stream
+                    .write_all(res.as_bytes())
+                    .expect("Failed to write respnse");
+            }
+            "psync" => {
+                let res = format!(
+                    "{} {} {}{}",
+                    "+FULLRESYNC",
+                    admin.get_replica_id(),
+                    "0",
+                    separator
+                );
+                println!("psync command respnse: {:?}", res);
                 stream
                     .write_all(res.as_bytes())
                     .expect("Failed to write respnse");
