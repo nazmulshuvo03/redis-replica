@@ -137,7 +137,7 @@ fn handle_response(mut admin: Admin, mut stream: TcpStream, mut storage: HashMap
                     .expect("Failed to write respnse");
             }
             _ => {
-                println!("Undefined command");
+                println!("Undefined command {:?}", command);
             }
         }
     }
