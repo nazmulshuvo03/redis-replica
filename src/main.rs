@@ -17,7 +17,7 @@ use utils::get_input_vector_from_stream;
 use crate::{
     admin::{Admin, Role},
     response::generate_response,
-    utils::write_steam,
+    utils::{write_steam, write_vector_steam},
 };
 
 fn handle_response(mut admin: Admin, mut stream: TcpStream, mut storage: HashMap<String, Assets>) {
@@ -27,8 +27,12 @@ fn handle_response(mut admin: Admin, mut stream: TcpStream, mut storage: HashMap
         let raw_input_vec = get_input_vector_from_stream(&mut stream, buff);
         println!("Raw input vector: {:?}", raw_input_vec);
 
-        let response_content = generate_response(raw_input_vec, &mut storage, &mut admin);
+        let (response_content, second_response) =
+            generate_response(raw_input_vec, &mut storage, &mut admin);
         write_steam(&mut stream, response_content);
+        if let Some(content) = second_response {
+            write_vector_steam(&mut stream, content);
+        }
     }
 }
 

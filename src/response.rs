@@ -1,12 +1,16 @@
 use std::collections::HashMap;
 
-use crate::{admin::Admin, assets::Assets};
+use crate::{
+    admin::Admin,
+    assets::Assets,
+    utils::{hex_to_binary_string, hex_to_binary_vector},
+};
 
 pub fn generate_response(
     raw_input_vec: Vec<String>,
     storage: &mut HashMap<String, Assets>,
     admin: &mut Admin,
-) -> String {
+) -> (String, Option<Vec<u8>>) {
     let separator = "\r\n";
     let line_break = "\n";
 
@@ -16,7 +20,7 @@ pub fn generate_response(
         "ping" => {
             let res = format!("{}{}", "+PONG", separator);
             println!("ping command response: {:?}", res);
-            res
+            (res, None)
         }
         "echo" => {
             let res = format!(
@@ -24,7 +28,7 @@ pub fn generate_response(
                 raw_input_vec[3], separator, raw_input_vec[4], separator
             );
             println!("echo command respnse: {:?}", res);
-            res
+            (res, None)
         }
         "set" => {
             let mut asset = Assets::new(raw_input_vec[6].to_string());
@@ -40,7 +44,7 @@ pub fn generate_response(
             storage.insert(raw_input_vec[4].to_string(), asset);
             let res = format!("{}{}", "+OK", separator,);
             println!("set command response: {:?}", res);
-            res
+            (res, None)
         }
         "get" => {
             if let Some(asset) = storage.get(raw_input_vec[4].as_str()) {
@@ -55,16 +59,16 @@ pub fn generate_response(
                         separator
                     );
                     println!("get command response object found: {:?}", res);
-                    res
+                    (res, None)
                 } else {
                     let res = format!("${}{}", "-1", separator);
                     println!("get command response object not found: {:?}", res);
-                    res
+                    (res, None)
                 }
             } else {
                 let res = format!("${}{}", "-1", separator);
                 println!("get command response object not found: {:?}", res);
-                res
+                (res, None)
             }
         }
         "info" => {
@@ -74,12 +78,12 @@ pub fn generate_response(
             let line = format!("{}{}{}{}{}", line1, line_break, line2, line_break, line3);
             let res = format!("${}{}{}{}", line.len(), separator, line, separator);
             println!("info command response: {:?}", res);
-            res
+            (res, None)
         }
         "replconf" => {
             let res = format!("{}{}", "+OK", separator);
             println!("replconf command response: {:?}", res);
-            res
+            (res, None)
         }
         "psync" => {
             let res = format!(
@@ -89,12 +93,24 @@ pub fn generate_response(
                 "0",
                 separator
             );
-            println!("psync command respnse: {:?}", res);
-            res
+            println!("psync command response: {:?}", res);
+
+            let empty_rdb_hex = "524544495330303131fa0972656469732d76657205372e322e30fa0a72656469732d62697473c040fa056374696d65c26d08bc65fa08757365642d6d656dc2b0c41000fa08616f662d62617365c000fff06e3bfec0ff5aa2";
+
+            let binary_string = hex_to_binary_string(empty_rdb_hex);
+            let formated_res = format!("${}{}{}", binary_string.len(), separator, binary_string);
+            println!("Formated binary string from RDB hex: {:?}", formated_res);
+
+            let binary_vec = hex_to_binary_vector(empty_rdb_hex).unwrap();
+            let mut vector_res = Vec::from(format!("${}{}", binary_vec.len(), separator));
+            vector_res.extend(&binary_vec);
+            println!("Formated binary vector from RDB hex: {:?}", vector_res);
+
+            (res, Some(vector_res))
         }
         _ => {
             println!("Undefined command {:?}", input_command);
-            String::from("")
+            (String::from(""), None)
         }
     }
 }
