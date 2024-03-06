@@ -1,145 +1,34 @@
 use std::{
     collections::HashMap,
     env::{self},
-    io::{Read, Write},
+    io::Read,
     net::{TcpListener, TcpStream},
     thread,
 };
 
 mod admin;
 mod assets;
-pub mod utils;
+mod response;
+mod utils;
 
 use assets::Assets;
+use utils::get_input_vector_from_stream;
 
-use crate::admin::{Admin, Role};
+use crate::{
+    admin::{Admin, Role},
+    response::generate_response,
+    utils::write_steam,
+};
 
 fn handle_response(mut admin: Admin, mut stream: TcpStream, mut storage: HashMap<String, Assets>) {
-    let mut buff = [0; 512];
-    let separator = "\r\n";
-    let line_break = "\n";
+    let buff = [0; 512];
 
     loop {
-        let bytes_read = stream.read(&mut buff).expect("Failed to read stream");
-        println!("bytes read: {:?}", bytes_read);
-
-        if bytes_read == 0 {
-            eprintln!("0 Bytes read from stream");
-            return;
-        }
-        let buff_vec = buff[..bytes_read].to_vec();
-        println!("Buffer vector: {:?}", buff_vec);
-        let raw_input = String::from_utf8(buff_vec).expect("String read failed");
-        let raw_input_str = raw_input.as_str();
-        println!("Raw input string: {:?}", raw_input_str);
-        raw_input_str.chars().for_each(|c| print!("{} ", c));
-        let raw_input_vec: Vec<&str> = raw_input_str.split(separator).collect();
+        let raw_input_vec = get_input_vector_from_stream(&mut stream, buff);
         println!("Raw input vector: {:?}", raw_input_vec);
 
-        let command = raw_input_vec[2];
-
-        match command.to_lowercase().as_str() {
-            "ping" => {
-                let res = format!("{}{}", "+PONG", separator);
-                println!("ping command response: {:?}", res);
-                stream
-                    .write_all(res.as_bytes())
-                    .expect("Failed to write respnse");
-            }
-            "echo" => {
-                let res = format!(
-                    "{}{}{}{}",
-                    raw_input_vec[3], separator, raw_input_vec[4], separator
-                );
-                println!("echo command respnse: {:?}", res);
-                stream
-                    .write_all(res.as_bytes())
-                    .expect("Failed to write respnse");
-            }
-            "set" => {
-                let mut asset = Assets::new(raw_input_vec[6].to_string());
-                if raw_input_vec.len() > 8 {
-                    if raw_input_vec[8] == "px" {
-                        asset.update_expiry(raw_input_vec[10]);
-                    } else {
-                        println!("set is provided with any other parameter than px")
-                    }
-                } else {
-                    println!("No expiry provide");
-                }
-                storage.insert(raw_input_vec[4].to_string(), asset);
-                let res = format!("{}{}", "+OK", separator,);
-                println!("set command response: {:?}", res);
-                stream
-                    .write_all(res.as_bytes())
-                    .expect("Failed to write respnse");
-            }
-            "get" => {
-                if let Some(asset) = storage.get(raw_input_vec[4]) {
-                    println!("Found asset: {:?}", asset);
-                    let mut new_asset = asset.clone();
-                    if !new_asset.is_value_expired() {
-                        let res = format!(
-                            "${}{}{}{}",
-                            new_asset.get_value_len(),
-                            separator,
-                            new_asset.get_value(),
-                            separator
-                        );
-                        println!("get command response object found: {:?}", res);
-                        stream
-                            .write_all(res.as_bytes())
-                            .expect("Failed to write response");
-                    } else {
-                        let res = format!("${}{}", "-1", separator);
-                        println!("get command response object not found: {:?}", res);
-                        stream
-                            .write_all(res.as_bytes())
-                            .expect("Failed to write response");
-                    }
-                } else {
-                    let res = format!("${}{}", "-1", separator);
-                    println!("get command response object not found: {:?}", res);
-                    stream
-                        .write_all(res.as_bytes())
-                        .expect("Failed to write response");
-                }
-            }
-            "info" => {
-                let line1 = format!("role:{}", admin.get_replica_role());
-                let line2 = format!("master_replid:{}", admin.get_replica_id());
-                let line3 = format!("master_repl_offset:{}", admin.get_replica_offset());
-                let line = format!("{}{}{}{}{}", line1, line_break, line2, line_break, line3);
-                let res = format!("${}{}{}{}", line.len(), separator, line, separator);
-                println!("info command response: {:?}", res);
-                stream
-                    .write_all(res.as_bytes())
-                    .expect("Failed to write message");
-            }
-            "replconf" => {
-                let res = format!("{}{}", "+OK", separator);
-                println!("replconf command response: {:?}", res);
-                stream
-                    .write_all(res.as_bytes())
-                    .expect("Failed to write respnse");
-            }
-            "psync" => {
-                let res = format!(
-                    "{} {} {}{}",
-                    "+FULLRESYNC",
-                    admin.get_replica_id(),
-                    "0",
-                    separator
-                );
-                println!("psync command respnse: {:?}", res);
-                stream
-                    .write_all(res.as_bytes())
-                    .expect("Failed to write respnse");
-            }
-            _ => {
-                println!("Undefined command {:?}", command);
-            }
-        }
+        let response_content = generate_response(raw_input_vec, &mut storage, &mut admin);
+        write_steam(&mut stream, response_content);
     }
 }
 
@@ -148,31 +37,22 @@ fn handle_handshake(master_host: String, master_port: u16) {
     let mut stream =
         TcpStream::connect(format!("{}:{}", master_host.as_str(), master_port)).unwrap();
     let buf = "*1\r\n$4\r\nping\r\n";
-    stream.write_all(buf.as_bytes()).unwrap();
+    write_steam(&mut stream, buf.to_string());
 
     let replconf_1 = "*3\r\n$8\r\nREPLCONF\r\n$14\r\nlistening-port\r\n$4\r\n6380\r\n";
-    stream.write_all(replconf_1.as_bytes()).unwrap();
+    write_steam(&mut stream, replconf_1.to_string());
 
     let replconf_2 = "*3\r\n$8\r\nREPLCONF\r\n$4\r\ncapa\r\n$6\r\npsync2\r\n";
-    stream.write_all(replconf_2.as_bytes()).unwrap();
+    write_steam(&mut stream, replconf_2.to_string());
 
     let psync = "*3\r\n$5\r\nPSYNC\r\n$1\r\n?\r\n$2\r\n-1\r\n";
-    stream.write_all(psync.as_bytes()).unwrap();
+    write_steam(&mut stream, psync.to_string());
 
     let result = stream.read(&mut read_buf);
     println!("Handshake result: {:?}", result)
 }
 
-fn main() {
-    // You can use print statements as follows for debugging, they'll be visible when running tests.
-    println!("Logs from your program will appear here!");
-
-    let storage: HashMap<String, Assets> = HashMap::new();
-    println!("Storage: {:?}", storage);
-
-    let mut admin = Admin::new();
-    println!("Admin: {:?}", admin);
-
+fn handle_env(admin: &mut Admin) {
     let args: Vec<String> = env::args().collect();
     println!("Env Args: {:?}", args);
 
@@ -188,6 +68,19 @@ fn main() {
         let role = Role::Slave;
         admin.set_replica(master_host, master_port, role);
     }
+}
+
+fn main() {
+    // You can use print statements as follows for debugging, they'll be visible when running tests.
+    println!("Logs from your program will appear here!");
+
+    let storage: HashMap<String, Assets> = HashMap::new();
+    println!("Storage: {:?}", storage);
+
+    let mut admin = Admin::new();
+    println!("Admin: {:?}", admin);
+
+    handle_env(&mut admin);
 
     // Uncomment this block to pass the first stage
     let listener = TcpListener::bind(format!("{}:{}", admin.get_host(), admin.get_port())).unwrap();
