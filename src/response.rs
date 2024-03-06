@@ -1,10 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{
-    admin::Admin,
-    assets::Assets,
-    utils::{hex_to_binary_string, hex_to_binary_vector},
-};
+use crate::{admin::Admin, assets::Assets, utils::hex_to_binary_vector};
 
 pub fn generate_response(
     raw_input_vec: Vec<String>,
@@ -97,9 +93,9 @@ pub fn generate_response(
 
             let empty_rdb_hex = "524544495330303131fa0972656469732d76657205372e322e30fa0a72656469732d62697473c040fa056374696d65c26d08bc65fa08757365642d6d656dc2b0c41000fa08616f662d62617365c000fff06e3bfec0ff5aa2";
 
-            let binary_string = hex_to_binary_string(empty_rdb_hex);
-            let formated_res = format!("${}{}{}", binary_string.len(), separator, binary_string);
-            println!("Formated binary string from RDB hex: {:?}", formated_res);
+            // let binary_string = hex_to_binary_string(empty_rdb_hex);
+            // let formated_res = format!("${}{}{}", binary_string.len(), separator, binary_string);
+            // println!("Formated binary string from RDB hex: {:?}", formated_res);
 
             let binary_vec = hex_to_binary_vector(empty_rdb_hex).unwrap();
             let mut vector_res = Vec::from(format!("${}{}", binary_vec.len(), separator));
