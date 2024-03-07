@@ -1,7 +1,10 @@
 use std::{
-    io::{Read, Write},
-    net::TcpStream,
+    error::Error,
     time::{SystemTime, UNIX_EPOCH},
+};
+use tokio::{
+    io::{AsyncReadExt, AsyncWriteExt},
+    net::TcpStream,
 };
 
 pub fn current_time_millis() -> u64 {
@@ -12,26 +15,30 @@ pub fn current_time_millis() -> u64 {
     since_the_epoch.as_secs() * 1000 + u64::from(since_the_epoch.subsec_millis())
 }
 
-pub fn write_steam(stream: &mut TcpStream, content: String) {
-    stream
-        .write_all(content.as_bytes())
-        .expect("Failed to write conent to stream")
+pub async fn write_steam(stream: &mut TcpStream, content: String) -> Result<(), Box<dyn Error>> {
+    stream.write_all(content.as_bytes()).await?;
+    Ok(())
 }
 
-pub fn write_vector_steam(stream: &mut TcpStream, content: Vec<u8>) {
-    stream
-        .write_all(&content)
-        .expect("Failed to write conent to stream")
+pub async fn write_vector_steam(
+    stream: &mut TcpStream,
+    content: Vec<u8>,
+) -> Result<(), Box<dyn Error>> {
+    stream.write_all(&content).await?;
+    Ok(())
 }
 
-pub fn get_input_vector_from_stream(stream: &mut TcpStream, mut buff: [u8; 512]) -> Vec<String> {
+pub async fn get_input_vector_from_stream(
+    stream: &mut TcpStream,
+    mut buff: [u8; 512],
+) -> Result<Vec<String>, Box<dyn Error>> {
     let separator = "\r\n";
-    let bytes_read = stream.read(&mut buff).expect("Failed to read stream");
+    let bytes_read = stream.read(&mut buff).await?;
     println!("bytes read: {:?}", bytes_read);
 
     if bytes_read == 0 {
         eprintln!("0 Bytes read from stream");
-        return Vec::new();
+        return Ok(Vec::new());
     }
 
     let buff_vec = buff[..bytes_read].to_vec();
@@ -39,7 +46,7 @@ pub fn get_input_vector_from_stream(stream: &mut TcpStream, mut buff: [u8; 512])
 
     let raw_input = String::from_utf8(buff_vec).expect("String read failed");
 
-    raw_input.split(separator).map(|s| s.to_string()).collect()
+    Ok(raw_input.split(separator).map(|s| s.to_string()).collect())
 }
 
 // pub fn hex_to_binary_string(hex_string: &str) -> String {

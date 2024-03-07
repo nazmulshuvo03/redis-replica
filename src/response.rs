@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::{admin::Admin, assets::Assets, utils::hex_to_binary_vector};
 
-pub fn generate_response(
+pub async fn generate_response(
     raw_input_vec: Vec<String>,
     storage: &mut HashMap<String, Assets>,
     admin: &mut Admin,
